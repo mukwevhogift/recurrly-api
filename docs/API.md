@@ -21,6 +21,8 @@ SubDub is an Express API for subscription tracking and renewal reminders.
 - The frontend authenticates with Clerk.
 - The frontend sends a Clerk session token in `Authorization: Bearer <token>`.
 - The backend verifies that token with Clerk middleware and resolves a local Mongo `User` record.
+- This repo mounts `clerkMiddleware()` globally, so the backend also needs `CLERK_PUBLISHABLE_KEY` in its environment.
+- `CLERK_JWT_KEY` is a different value from the publishable key. It is the Clerk JWT verification key and is optional but recommended.
 
 ### Why a local `User` record still exists
 - Subscriptions reference `User` by Mongo ObjectId.
@@ -174,9 +176,9 @@ Security:
 | `PORT` | Yes | HTTP server port |
 | `SERVER_URL` | Yes | Public server URL |
 | `DB_URI` | Yes | MongoDB connection string |
-| `CLERK_SECRET_KEY` | Yes | Clerk backend secret |
-| `CLERK_PUBLISHABLE_KEY` | Yes | Clerk publishable key |
-| `CLERK_JWT_KEY` | Recommended | Enables networkless token verification |
+| `CLERK_SECRET_KEY` | Yes | Clerk backend secret key (`sk_*`) |
+| `CLERK_PUBLISHABLE_KEY` | Yes | Clerk publishable key (`pk_*`). Required in this repo because Clerk middleware is mounted globally in the API |
+| `CLERK_JWT_KEY` | Recommended | Clerk JWT verification key. This is not the publishable key. Enables networkless token verification |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | Yes | Clerk webhook secret |
 | `CLERK_AUTHORIZED_PARTIES` | Recommended | Comma-separated allowed frontend origins for Clerk tokens |
 | `CORS_ORIGINS` | Recommended | Comma-separated browser origins allowed to call the API |
@@ -197,3 +199,4 @@ curl -X GET http://localhost:5500/api/v1/users/me \
 - Local email/password authentication has been removed from the backend.
 - The app still keeps Mongo users because subscriptions and reminder emails depend on them.
 - `scripts/test-reminder.sh` now expects a Clerk session token instead of calling `/auth/signin`.
+- If `CLERK_JWT_KEY` is omitted, Clerk token verification can still work, but networkless verification is not enabled.

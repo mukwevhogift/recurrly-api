@@ -9,6 +9,8 @@ info:
     - Base API prefix is /api/v1.
     - The frontend authenticates with Clerk and sends a session token as a Bearer token.
     - The backend keeps a local Mongo user profile keyed by clerkId for subscriptions and reminder emails.
+    - This repo mounts Clerk middleware globally, so the backend environment must include CLERK_PUBLISHABLE_KEY.
+    - CLERK_JWT_KEY is the JWT verification key, not the publishable key, and is optional but recommended.
 servers:
   - url: http://localhost:5500
     description: Local development
