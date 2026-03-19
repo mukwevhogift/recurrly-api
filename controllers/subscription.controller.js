@@ -37,14 +37,41 @@ const buildPaginationMeta = ({ total, page, limit }) => {
   };
 };
 
-// GET all subscriptions
+const createError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const sanitizeSubscriptionInput = (payload) => {
+  const nextPayload = { ...payload };
+  delete nextPayload.status;
+  delete nextPayload.user;
+  return nextPayload;
+};
+
+const getOwnedSubscription = async (subscriptionId, userId) => {
+  const subscription = await Subscription.findOne({
+    _id: subscriptionId,
+    user: userId,
+  });
+
+  if (!subscription) {
+    throw createError("Subscription not found", 404);
+  }
+
+  return subscription;
+};
+
+// GET authenticated user's subscriptions
 export const getSubscriptions = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
+    const filter = { user: req.user._id };
 
     const [subscriptions, total] = await Promise.all([
-      Subscription.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Subscription.countDocuments(),
+      Subscription.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Subscription.countDocuments(filter),
     ]);
 
     res.status(200).json({
@@ -61,12 +88,8 @@ export const getSubscriptions = async (req, res, next) => {
 // GET subscription by id
 export const getSubscription = async (req, res, next) => {
   try {
-    const subscription = await Subscription.findById(req.params.id);
-    if (!subscription) {
-      const error = new Error("Subscription not found");
-      error.statusCode = 404;
-      throw error;
-    }
+    const subscription = await getOwnedSubscription(req.params.id, req.user._id);
+
     res.status(200).json({
       success: true,
       message: "Subscription fetched successfully",
@@ -81,7 +104,7 @@ export const getSubscription = async (req, res, next) => {
 export const createSubscription = async (req, res, next) => {
   try {
     const subscription = await Subscription.create({
-      ...req.body,
+      ...sanitizeSubscriptionInput(req.body),
       user: req.user._id,
     });
 
@@ -112,16 +135,14 @@ export const createSubscription = async (req, res, next) => {
 // PUT update subscription by id
 export const updateSubscription = async (req, res, next) => {
   try {
-    const subscription = await Subscription.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+    const subscription = await Subscription.findOneAndUpdate(
+      { _id: req.params.id, user: req.user._id },
+      sanitizeSubscriptionInput(req.body),
       { new: true, runValidators: true }
     );
 
     if (!subscription) {
-      const error = new Error("Subscription not found");
-      error.statusCode = 404;
-      throw error;
+      throw createError("Subscription not found", 404);
     }
 
     res.status(200).json({
@@ -137,12 +158,13 @@ export const updateSubscription = async (req, res, next) => {
 // DELETE delete subscription by id
 export const deleteSubscription = async (req, res, next) => {
   try {
-    const subscription = await Subscription.findByIdAndDelete(req.params.id);
+    const subscription = await Subscription.findOneAndDelete({
+      _id: req.params.id,
+      user: req.user._id,
+    });
 
     if (!subscription) {
-      const error = new Error("Subscription not found");
-      error.statusCode = 404;
-      throw error;
+      throw createError("Subscription not found", 404);
     }
 
     res.status(200).json({
@@ -160,11 +182,8 @@ export const getUserSubscriptions = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
 
-    // check if user is the owner of the subscription
     if (req.user.id !== req.params.id) {
-      const error = new Error("You are not the owner of this subscription");
-      error.statusCode = 401;
-      throw error;
+      throw createError("You are not the owner of this subscription", 403);
     }
 
     const filter = { user: req.params.id };
@@ -187,21 +206,8 @@ export const getUserSubscriptions = async (req, res, next) => {
 // PUT cancel subscription of a user
 export const cancelSubscription = async (req, res, next) => {
   try {
-    const subscription = await Subscription.findById(req.params.id);
-    if (!subscription) {
-      const error = new Error("Subscription not found");
-      error.statusCode = 404;
-      throw error;
-    }
+    const subscription = await getOwnedSubscription(req.params.id, req.user._id);
 
-    // check if user is the owner of the subscription
-    if (subscription.user.toString() !== req.user.id) {
-      const error = new Error("You are not the owner of this subscription");
-      error.statusCode = 401;
-      throw error;
-    }
-
-    // set status to cancelled
     subscription.status = "cancelled";
     await subscription.save();
 
@@ -220,23 +226,16 @@ export const getUpcomingRenewals = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
 
-    // check if user is the owner of the subscription
-    if (req.user.id !== req.params.id) {
-      const error = new Error("You are not the owner of this subscription");
-      error.statusCode = 401;
-      throw error;
-    }
-
     const filter = {
-      user: req.params.id,
+      user: req.user._id,
       status: "active",
+      renewalDate: { $gte: new Date() },
     };
     const [subscriptions, total] = await Promise.all([
       Subscription.find(filter)
         .sort({ renewalDate: 1 })
         .skip(skip)
-        .limit(limit)
-        .populate("user", "name email"),
+        .limit(limit),
       Subscription.countDocuments(filter),
     ]);
 

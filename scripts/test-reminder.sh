@@ -2,8 +2,8 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://subdub-sigma.vercel.app}"
-EMAIL="${EMAIL:-tidbitsjs@gmail.com}"
-PASSWORD="${1:-${PASSWORD:-}}"
+TOKEN="${1:-${TOKEN:-${CLERK_TOKEN:-}}}"
+EMAIL="${EMAIL:-}"
 USER_AGENT="${USER_AGENT:-Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36}"
 ARCJET_BYPASS_TOKEN="${ARCJET_BYPASS_TOKEN:-}"
 
@@ -19,24 +19,9 @@ if [ -n "$ARCJET_BYPASS_TOKEN" ]; then
   COMMON_HEADERS+=(-H "x-arcjet-bypass: $ARCJET_BYPASS_TOKEN")
 fi
 
-if [ -z "$PASSWORD" ]; then
-  read -r -s -p "Password for ${EMAIL}: " PASSWORD
-  echo
-fi
-
 echo "Using base URL: $BASE_URL"
-echo "Using account: $EMAIL"
-
-echo "Signing in..."
-SIGNIN_RESPONSE=$(curl -sS -X POST "$BASE_URL/api/v1/auth/signin" \
-  "${COMMON_HEADERS[@]}" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
-
-TOKEN=$(printf '%s' "$SIGNIN_RESPONSE" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{const j=JSON.parse(d);process.stdout.write(j?.data?.token||"")}catch{process.stdout.write("")}})')
-
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "Sign-in failed. Raw response:"
-  echo "$SIGNIN_RESPONSE"
+if [ -z "$TOKEN" ]; then
+  echo "Provide a Clerk session token as the first argument or via TOKEN/CLERK_TOKEN."
   exit 1
 fi
 
@@ -64,4 +49,8 @@ if [ -n "$WORKFLOW_RUN_ID" ]; then
   echo "Workflow run id: $WORKFLOW_RUN_ID"
 fi
 
-echo "Check inbox for $EMAIL in about 1-2 minutes."
+if [ -n "$EMAIL" ]; then
+  echo "Check inbox for $EMAIL in about 1-2 minutes."
+else
+  echo "Check the email address attached to the Clerk account in about 1-2 minutes."
+fi

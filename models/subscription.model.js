@@ -83,6 +83,10 @@ subscriptionSchema.pre("validate", function (next) {
       .toDate();
   }
 
+  if (this.status === "cancelled") {
+    return next();
+  }
+
   const now = dayjs();
   const renewalDay = dayjs(this.renewalDate);
 

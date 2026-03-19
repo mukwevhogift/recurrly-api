@@ -1,34 +1,28 @@
 openapi: 3.1.0
 info:
   title: SubDub API
-  version: 1.0.0
+  version: 2.0.0
   description: |
-    OpenAPI contract for the SubDub service.
+    OpenAPI contract for the current Clerk-backed SubDub API.
 
     Notes:
     - Base API prefix is /api/v1.
-    - Arcjet security middleware is applied globally and can return 403/429 before route handlers.
-    - Some endpoints are placeholders or have known behavior gaps; see endpoint descriptions.
+    - The frontend authenticates with Clerk and sends a session token as a Bearer token.
+    - The backend keeps a local Mongo user profile keyed by clerkId for subscriptions and reminder emails.
 servers:
   - url: http://localhost:5500
     description: Local development
-  - url: '{SERVER_URL}'
-    description: Configured deployment URL
-    variables:
-      SERVER_URL:
-        default: http://localhost:5500
 tags:
   - name: Health
   - name: Auth
   - name: Users
   - name: Subscriptions
-  - name: Workflows
+  - name: Webhooks
 paths:
   /:
     get:
       tags: [Health]
       summary: Service health check
-      operationId: getRootHealth
       responses:
         '200':
           description: Plain text health response
@@ -37,191 +31,112 @@ paths:
               schema:
                 type: string
                 example: Hello World!
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
 
   /api/v1/auth/signup:
     post:
       tags: [Auth]
-      summary: Register a new user
-      operationId: signup
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SignupRequest'
+      summary: Deprecated local sign-up route
       responses:
-        '201':
-          description: User created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthSuccessResponse'
-        '400':
-          $ref: '#/components/responses/ValidationOrBusinessError'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        '410':
+          $ref: '#/components/responses/DeprecatedAuth'
 
   /api/v1/auth/signin:
     post:
       tags: [Auth]
-      summary: Authenticate a user
-      operationId: signin
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SigninRequest'
+      summary: Deprecated local sign-in route
       responses:
-        '200':
-          description: Sign in successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthSuccessResponse'
-        '400':
-          $ref: '#/components/responses/ValidationOrBusinessError'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+        '410':
+          $ref: '#/components/responses/DeprecatedAuth'
 
   /api/v1/auth/signout:
     post:
       tags: [Auth]
-      summary: Sign out user (placeholder)
-      description: Currently returns a plain text placeholder response.
-      operationId: signout
+      summary: Informational sign-out route
       responses:
         '200':
-          description: Placeholder response
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: signout
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-
-  /api/v1/users:
-    get:
-      tags: [Users]
-      summary: List users
-      operationId: getUsers
-      description: Returns all users. Current implementation includes hashed password in payload.
-      responses:
-        '200':
-          description: Users fetched
+          description: Sign-out handled on the frontend by Clerk
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserListSuccessResponse'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/MessageResponse'
+
+  /api/v1/webhooks/clerk:
     post:
-      tags: [Users]
-      summary: Create user (placeholder)
-      operationId: createUserPlaceholder
+      tags: [Webhooks]
+      summary: Clerk webhook receiver
       responses:
         '200':
-          description: Placeholder response
+          description: Webhook processed successfully
           content:
-            text/plain:
+            application/json:
               schema:
-                type: string
-                example: create user
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
-  /api/v1/users/{id}:
-    parameters:
-      - $ref: '#/components/parameters/ObjectId'
+  /api/v1/users/me:
     get:
       tags: [Users]
-      summary: Get user by ID
-      operationId: getUserById
+      summary: Get current authenticated user
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: User fetched
+          description: Current user
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserPublicSuccessResponse'
+                $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get current user by Mongo id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-    put:
-      tags: [Users]
-      summary: Update user (placeholder)
-      operationId: updateUserPlaceholder
-      responses:
-        '200':
-          description: Placeholder response
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: update user
-    delete:
-      tags: [Users]
-      summary: Delete user (placeholder)
-      operationId: deleteUserPlaceholder
-      responses:
-        '200':
-          description: Placeholder response
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: delete user
 
   /api/v1/subscriptions:
     get:
       tags: [Subscriptions]
-      summary: List subscriptions
-      operationId: getSubscriptions
+      summary: List the current user's subscriptions
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/PageQuery'
         - $ref: '#/components/parameters/LimitQuery'
       responses:
         '200':
-          description: Subscriptions fetched
+          description: Paginated subscriptions
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionListSuccessResponse'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+                $ref: '#/components/schemas/SubscriptionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags: [Subscriptions]
-      summary: Create subscription
-      operationId: createSubscription
-      description: Creates a subscription for the authenticated user and triggers reminder workflow.
+      summary: Create a subscription for the current user
       security:
         - bearerAuth: []
       requestBody:
@@ -229,192 +144,185 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionCreateRequest'
+              $ref: '#/components/schemas/SubscriptionInput'
       responses:
         '201':
           description: Subscription created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionCreateSuccessResponse'
+                $ref: '#/components/schemas/SubscriptionCreateResponse'
         '400':
-          $ref: '#/components/responses/ValidationOrBusinessError'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
 
-  /api/v1/subscriptions/{id}:
-    parameters:
-      - $ref: '#/components/parameters/ObjectId'
+  /api/v1/subscriptions/me:
     get:
       tags: [Subscriptions]
-      summary: Get subscription by ID
-      operationId: getSubscriptionById
+      summary: Alias for listing the current user's subscriptions
+      security:
+        - bearerAuth: []
       responses:
         '200':
-          description: Subscription fetched
+          description: Paginated subscriptions
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionSuccessResponse'
+                $ref: '#/components/schemas/SubscriptionListResponse'
+
+  /api/v1/subscriptions/user/{id}:
+    get:
+      tags: [Subscriptions]
+      summary: Compatibility route for older clients
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/subscriptions/upcoming-renewals:
+    get:
+      tags: [Subscriptions]
+      summary: List the current user's upcoming renewals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Upcoming renewals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/subscriptions/me/upcoming-renewals:
+    get:
+      tags: [Subscriptions]
+      summary: Alias for the current user's upcoming renewals
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Upcoming renewals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionListResponse'
+
+  /api/v1/subscriptions/{id}:
+    get:
+      tags: [Subscriptions]
+      summary: Get one subscription owned by the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
     put:
       tags: [Subscriptions]
-      summary: Update subscription by ID
-      operationId: updateSubscriptionById
-      description: Current implementation does not enforce auth middleware on this endpoint.
+      summary: Update one owned subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionUpdateRequest'
+              $ref: '#/components/schemas/SubscriptionInput'
       responses:
         '200':
           description: Subscription updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionSuccessResponse'
-        '400':
-          $ref: '#/components/responses/ValidationOrBusinessError'
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
       tags: [Subscriptions]
-      summary: Delete subscription by ID
-      operationId: deleteSubscriptionById
-      description: Current implementation does not enforce auth middleware on this endpoint.
+      summary: Delete one owned subscription
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Subscription deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionSuccessResponse'
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/v1/subscriptions/user/{id}:
-    parameters:
-      - $ref: '#/components/parameters/ObjectId'
-    get:
-      tags: [Subscriptions]
-      summary: List subscriptions by user ID
-      operationId: getUserSubscriptions
-      description: Allowed only if authenticated user ID matches path ID.
-      parameters:
-        - $ref: '#/components/parameters/PageQuery'
-        - $ref: '#/components/parameters/LimitQuery'
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: User subscriptions fetched
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubscriptionListSuccessResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
-
   /api/v1/subscriptions/{id}/cancel:
-    parameters:
-      - $ref: '#/components/parameters/ObjectId'
     put:
       tags: [Subscriptions]
-      summary: Cancel subscription
-      operationId: cancelSubscription
-      description: Allowed only if authenticated user owns the subscription.
+      summary: Cancel one owned subscription
       security:
         - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Subscription cancelled
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SubscriptionSuccessResponse'
+                $ref: '#/components/schemas/SubscriptionResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-
-  /api/v1/subscriptions/upcoming-renewals:
-    get:
-      tags: [Subscriptions]
-      summary: Upcoming renewals (known implementation issue)
-      operationId: getUpcomingRenewals
-      parameters:
-        - $ref: '#/components/parameters/PageQuery'
-        - $ref: '#/components/parameters/LimitQuery'
-      description: |
-        Intended behavior: returns active subscriptions approaching renewal for authenticated user.
-
-        Current code has route-order and parameter mismatch issues, so runtime behavior does not match intent.
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Upcoming renewals fetched (intended)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SubscriptionListSuccessResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/v1/workflows/subscription/reminder:
-    post:
-      tags: [Workflows]
-      summary: Workflow reminder webhook endpoint
-      operationId: sendSubscriptionReminders
-      description: |
-        Upstash Workflow endpoint for reminder scheduling and email dispatch.
-        This endpoint is intended for Upstash/QStash calls rather than direct public client calls.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WorkflowReminderRequest'
-      responses:
-        '200':
-          description: Workflow handled
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '202':
-          description: Accepted by workflow runtime
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '400':
-          $ref: '#/components/responses/ValidationOrBusinessError'
-        '403':
-          $ref: '#/components/responses/ArcjetForbidden'
-        '429':
-          $ref: '#/components/responses/ArcjetRateLimited'
 
 components:
   securitySchemes:
@@ -422,170 +330,82 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
   parameters:
-    ObjectId:
-      name: id
-      in: path
-      required: true
-      description: MongoDB ObjectId
-      schema:
-        type: string
-        pattern: '^[a-fA-F0-9]{24}$'
     PageQuery:
       name: page
       in: query
-      required: false
-      description: Page number for pagination.
       schema:
         type: integer
         minimum: 1
-        default: 1
     LimitQuery:
       name: limit
       in: query
-      required: false
-      description: Page size for pagination. Values above 100 are capped to 100.
       schema:
         type: integer
         minimum: 1
         maximum: 100
-        default: 10
-
   responses:
     Unauthorized:
-      description: Authentication or authorization failed
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/AuthErrorResponse'
+      description: Missing or invalid Clerk session token
+    Forbidden:
+      description: Authenticated but not allowed to access the resource
     NotFound:
       description: Resource not found
+    BadRequest:
+      description: Invalid request payload
+    DeprecatedAuth:
+      description: Local email/password auth has been removed
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    ValidationOrBusinessError:
-      description: Validation or business rule error
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    InternalServerError:
-      description: Unexpected server error
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    ArcjetForbidden:
-      description: Request denied by Arcjet security middleware
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ArcjetErrorResponse'
-    ArcjetRateLimited:
-      description: Request rate-limited by Arcjet
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ArcjetErrorResponse'
-
+            $ref: '#/components/schemas/MessageResponse'
   schemas:
-    SignupRequest:
+    MessageResponse:
       type: object
-      required: [name, email, password]
       properties:
-        name:
+        success:
+          type: boolean
+        message:
           type: string
-          minLength: 2
-          maxLength: 50
-          example: Jane Doe
-        email:
-          type: string
-          format: email
-          example: jane@example.com
-        password:
-          type: string
-          minLength: 8
-          example: strongPassword123
-
-    SigninRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email:
-          type: string
-          format: email
-          example: jane@example.com
-        password:
-          type: string
-          example: strongPassword123
-
     User:
       type: object
       properties:
         _id:
           type: string
-          pattern: '^[a-fA-F0-9]{24}$'
+        clerkId:
+          type: string
         name:
           type: string
         email:
           type: string
-          format: email
-        password:
+        authProvider:
           type: string
-          description: Hashed password. Currently present in some responses.
-        createdAt:
+        imageUrl:
           type: string
-          format: date-time
-        updatedAt:
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
           type: string
-          format: date-time
-        __v:
-          type: integer
-      additionalProperties: true
-
-    UserPublic:
-      allOf:
-        - $ref: '#/components/schemas/User'
-        - type: object
-          properties:
-            password:
-              readOnly: true
-              deprecated: true
-          required: []
-
+        data:
+          $ref: '#/components/schemas/User'
     Subscription:
       type: object
-      required:
-        - name
-        - price
-        - currency
-        - frequency
-        - category
-        - startDate
-        - paymentMethod
-        - user
       properties:
         _id:
           type: string
-          pattern: '^[a-fA-F0-9]{24}$'
         name:
           type: string
-          minLength: 2
-          maxLength: 100
         price:
           type: number
-          minimum: 0
         currency:
           type: string
-          enum: [USD, EUR, GBP, INR, JPY, AUD]
         frequency:
           type: string
-          enum: [monthly, quarterly, yearly]
         category:
           type: string
-          enum: [Entertainment, Food, Health, Other]
         startDate:
           type: string
           format: date-time
@@ -596,21 +416,9 @@ components:
           type: string
         status:
           type: string
-          enum: [active, cancelled, expired]
         user:
           type: string
-          pattern: '^[a-fA-F0-9]{24}$'
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-        __v:
-          type: integer
-      additionalProperties: true
-
-    SubscriptionCreateRequest:
+    SubscriptionInput:
       type: object
       required:
         - name
@@ -623,54 +431,14 @@ components:
       properties:
         name:
           type: string
-          minLength: 2
-          maxLength: 100
-          example: Netflix Premium
-        price:
-          type: number
-          minimum: 0
-          example: 15.99
-        currency:
-          type: string
-          enum: [USD, EUR, GBP, INR, JPY, AUD]
-          example: USD
-        frequency:
-          type: string
-          enum: [monthly, quarterly, yearly]
-          example: monthly
-        category:
-          type: string
-          enum: [Entertainment, Food, Health, Other]
-          example: Entertainment
-        startDate:
-          type: string
-          format: date-time
-          example: '2026-03-01T00:00:00.000Z'
-        renewalDate:
-          type: string
-          format: date-time
-          description: Optional; auto-computed if missing.
-          example: '2026-03-31T00:00:00.000Z'
-        paymentMethod:
-          type: string
-          example: Visa **** 4242
-
-    SubscriptionUpdateRequest:
-      type: object
-      properties:
-        name:
-          type: string
         price:
           type: number
         currency:
           type: string
-          enum: [USD, EUR, GBP, INR, JPY, AUD]
         frequency:
           type: string
-          enum: [monthly, quarterly, yearly]
         category:
           type: string
-          enum: [Entertainment, Food, Health, Other]
         startDate:
           type: string
           format: date-time
@@ -679,176 +447,54 @@ components:
           format: date-time
         paymentMethod:
           type: string
-        status:
-          type: string
-          enum: [active, cancelled, expired]
-
-    WorkflowReminderRequest:
+    Pagination:
       type: object
-      required: [subscriptionId]
       properties:
-        subscriptionId:
-          type: string
-          pattern: '^[a-fA-F0-9]{24}$'
-
-    AuthSuccessResponse:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
+    SubscriptionResponse:
       type: object
-      required: [success, message, data]
       properties:
         success:
           type: boolean
-          const: true
         message:
           type: string
-          example: Signed in successfully
-        data:
-          type: object
-          required: [token, user]
-          properties:
-            token:
-              type: string
-            user:
-              $ref: '#/components/schemas/User'
-
-    UserListSuccessResponse:
-      type: object
-      required: [success, message, data]
-      properties:
-        success:
-          type: boolean
-          const: true
-        message:
-          type: string
-          example: Users fetched successfully
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/User'
-
-    UserPublicSuccessResponse:
-      type: object
-      required: [success, message, data]
-      properties:
-        success:
-          type: boolean
-          const: true
-        message:
-          type: string
-          example: User fetched successfully
-        data:
-          $ref: '#/components/schemas/UserPublic'
-
-    SubscriptionSuccessResponse:
-      type: object
-      required: [success, message, data]
-      properties:
-        success:
-          type: boolean
-          const: true
-        message:
-          type: string
-          example: Subscription fetched successfully
         data:
           $ref: '#/components/schemas/Subscription'
-
-    SubscriptionListSuccessResponse:
+    SubscriptionListResponse:
       type: object
-      required: [success, message, data, pagination]
       properties:
         success:
           type: boolean
-          const: true
         message:
           type: string
-          example: Subscriptions fetched successfully
         data:
           type: array
           items:
             $ref: '#/components/schemas/Subscription'
         pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-
-    PaginationMeta:
+          $ref: '#/components/schemas/Pagination'
+    SubscriptionCreateResponse:
       type: object
-      required: [total, page, limit, totalPages, hasNextPage, hasPrevPage]
-      properties:
-        total:
-          type: integer
-          minimum: 0
-          example: 57
-        page:
-          type: integer
-          minimum: 1
-          example: 2
-        limit:
-          type: integer
-          minimum: 1
-          maximum: 100
-          example: 10
-        totalPages:
-          type: integer
-          minimum: 1
-          example: 6
-        hasNextPage:
-          type: boolean
-          example: true
-        hasPrevPage:
-          type: boolean
-          example: true
-
-    SubscriptionCreateSuccessResponse:
-      type: object
-      required: [success, message, data]
       properties:
         success:
           type: boolean
-          const: true
         message:
           type: string
-          example: Subscription created successfully
         data:
           type: object
-          required: [subscription, workflowRunId]
           properties:
             subscription:
               $ref: '#/components/schemas/Subscription'
             workflowRunId:
               type: string
-
-    ErrorResponse:
-      type: object
-      required: [success, message]
-      properties:
-        success:
-          type: boolean
-          const: false
-        message:
-          type: string
-        error:
-          type: string
-          description: Stringified error object in current middleware implementation.
-
-    AuthErrorResponse:
-      type: object
-      required: [success, message]
-      properties:
-        success:
-          type: boolean
-          const: false
-        message:
-          type: string
-          example: Not authorized, no token
-        error:
-          type: string
-          example: jwt malformed
-
-    ArcjetErrorResponse:
-      type: object
-      required: [success, error]
-      properties:
-        success:
-          type: boolean
-          const: false
-        error:
-          type: string
-          examples: [Too Many Requests, 'Forbidden: Bot detected', Forbidden]

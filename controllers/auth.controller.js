@@ -1,84 +1,23 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+const authRemovedMessage =
+  "Local email/password auth has been removed. Sign in with Clerk on the frontend and send the Clerk session token to this API.";
 
-import User from "../models/user.model.js";
-import { JWT_EXPIRES_IN, JWT_SECRET } from "../config/env.js";
-
-export const signup = async (req, res, next) => {
-  try {
-    const { name, email, password } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      const error = new Error("User already exists");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-    });
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: newUser._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      data: {
-        token,
-        user: newUser,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+export const signup = (req, res) => {
+  res.status(410).json({
+    success: false,
+    message: authRemovedMessage,
+  });
 };
 
-export const signin = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
+export const signin = (req, res) => {
+  res.status(410).json({
+    success: false,
+    message: authRemovedMessage,
+  });
+};
 
-    // Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      const error = new Error("User not found");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      const error = new Error("Invalid credentials");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Signed in successfully",
-      data: {
-        token,
-        user,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+export const signout = (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Sign out is handled by Clerk on the frontend.",
+  });
 };

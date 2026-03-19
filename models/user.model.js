@@ -2,6 +2,13 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
+    clerkId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      trim: true,
+    },
     name: {
       type: String,
       required: [true, "User Name is required"],
@@ -17,13 +24,36 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/\S+@\S+\.\S+/, "Invalid email format"],
     },
+    authProvider: {
+      type: String,
+      enum: ["local", "clerk"],
+      default: "local",
+    },
+    imageUrl: {
+      type: String,
+      trim: true,
+    },
     password: {
       type: String,
-      required: [true, "Password is required"],
       minlength: 8,
+      select: false,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: {
+      transform: (doc, ret) => {
+        delete ret.password;
+        return ret;
+      },
+    },
+    toObject: {
+      transform: (doc, ret) => {
+        delete ret.password;
+        return ret;
+      },
+    },
+  }
 );
 
 const User = mongoose.model("User", userSchema);
