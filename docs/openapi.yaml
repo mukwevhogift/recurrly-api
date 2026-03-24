@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SubDub API
-  version: 2.0.0
+  version: 2.0.1
   description: |
     OpenAPI contract for the current Clerk-backed SubDub API.
 
@@ -408,6 +408,10 @@ components:
           type: string
         category:
           type: string
+        color:
+          type: string
+          pattern: '^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$'
+          default: '#2563EB'
         startDate:
           type: string
           format: date-time
@@ -441,6 +445,10 @@ components:
           type: string
         category:
           type: string
+        color:
+          type: string
+          pattern: '^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$'
+          default: '#2563EB'
         startDate:
           type: string
           format: date-time

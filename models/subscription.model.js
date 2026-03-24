@@ -1,6 +1,8 @@
 import dayjs from "dayjs";
 import mongoose from "mongoose";
 
+const HEX_COLOR_REGEX = /^#(?:[0-9A-F]{3}|[0-9A-F]{6})$/i;
+
 const subscriptionSchema = new mongoose.Schema(
   {
     name: {
@@ -29,6 +31,13 @@ const subscriptionSchema = new mongoose.Schema(
       type: String,
       enum: ["Entertainment", "Food", "Health", "Other"],
       required: true,
+    },
+    color: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "#2563EB",
+      match: [HEX_COLOR_REGEX, "Color must be a valid hex color"],
     },
     startDate: {
       type: Date,
